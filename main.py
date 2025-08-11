@@ -140,6 +140,13 @@ class SVGToTGSBot:
             'message': update.message
         })
         
+        # Send immediate status message if this is the first file
+        if len(self.pending_conversions[user_id]['files']) == 1:
+            status_message = await self.send_message(
+                chat_id, "⏳ Please wait..."
+            )
+            self.pending_conversions[user_id]['status_message'] = status_message
+        
         # Cancel previous timer if exists
         if self.pending_conversions[user_id]['timer']:
             self.pending_conversions[user_id]['timer'].cancel()
@@ -162,14 +169,17 @@ class SVGToTGSBot:
         batch_data = self.pending_conversions[user_id]
         files = batch_data['files']
         chat_id = batch_data['chat_id']
+        status_message = batch_data.get('status_message')
         
         if not files:
             return
         
-        # Send initial status message
-        status_message = await self.send_message(
-            chat_id, "⏳ Please wait..."
-        )
+        # Use existing status message or create new one if not exists
+        if not status_message:
+            status_message = await self.send_message(
+                chat_id, "⏳ Please wait..."
+            )
+            self.pending_conversions[user_id]['status_message'] = status_message
         
         await asyncio.sleep(3)  # Wait 3 seconds as requested
         
@@ -234,17 +244,11 @@ class SVGToTGSBot:
                     f"❌ **{document.file_name}**: Processing error occurred."
                 )
         
-        # Final status update
-        if successful_conversions > 0:
-            await self.edit_message(
-                chat_id, status_message.message_id,
-                f"✅ Done! Successfully converted {successful_conversions}/{file_count} file{'s' if file_count > 1 else ''}."
-            )
-        else:
-            await self.edit_message(
-                chat_id, status_message.message_id,
-                "❌ No files were successfully converted."
-            )
+        # Final status update - just "Done ✅" as requested
+        await self.edit_message(
+            chat_id, status_message.message_id,
+            "Done ✅"
+        )
         
         # Clean up
         del self.pending_conversions[user_id]
